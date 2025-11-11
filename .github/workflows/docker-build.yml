@@ -1,0 +1,39 @@
+name: Build and Deploy (Corretto 21 + Maven 3.6.3)
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Corretto)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'corretto'
+          java-version: '21'
+
+      - name: Build with Maven 3.6.3
+        run: |
+          wget https://archive.apache.org/dist/maven/maven-3/3.6.3/binaries/apache-maven-3.6.3-bin.tar.gz
+          tar -xzf apache-maven-3.6.3-bin.tar.gz
+          export PATH=$PWD/apache-maven-3.6.3/bin:$PATH
+          mvn -v
+          mvn clean package -DskipTests
+
+      - name: Log in to Docker Hub
+        run: echo "${{ secrets.DOCKER_HUB_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker image
+        run: docker build -t myusername/myapp:${{ github.sha }} .
+
+      - name: Push Docker image
+        run: |
+          docker push myusername/myapp:${{ github.sha }}
+          docker tag myusername/myapp:${{ github.sha }} myusername/myapp:latest
+          docker push myusername/myapp:latest
